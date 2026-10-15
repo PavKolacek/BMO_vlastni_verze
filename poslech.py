@@ -4,11 +4,11 @@ import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 
 
-MODEL_PATH = r"C:\Users\pavek\Desktop\UNOB\BMO\vosk-model-small-cs-0.4-rhasspy"
+MODEL_PATH = r"C:\Users\pavek\Desktop\UNOB\BMO\vosk-model-small-en-us-0.15"
 SAMPLE_RATE = 16000
 
 audio_queue = queue.Queue()
-
+collected_text = []
 
 def callback(indata, frames, time, status):
     if status:
@@ -23,29 +23,31 @@ def main():
     recognizer = KaldiRecognizer(model, SAMPLE_RATE)
 
     print("Mluv do mikrofonu. Pro ukončení stiskni CTRL+C.")
+    try:
+        with sd.RawInputStream(
+            samplerate=SAMPLE_RATE,
+            blocksize=16000,
+            dtype="int16",
+            channels=1,
+            callback=callback
+        ):
+            while True:
+                data = audio_queue.get()
 
-    with sd.RawInputStream(
-        samplerate=SAMPLE_RATE,
-        blocksize=8000,
-        dtype="int16",
-        channels=1,
-        callback=callback
-    ):
-        while True:
-            data = audio_queue.get()
+                if recognizer.AcceptWaveform(data):
+                    result = json.loads(recognizer.Result())
+                    text = result.get("text", "")
 
-            if recognizer.AcceptWaveform(data):
-                result = json.loads(recognizer.Result())
-                text = result.get("text", "")
-
-                if text:
-                    print("Rozpoznáno:", text)
-            else:
-                partial = json.loads(recognizer.PartialResult())
-                partial_text = partial.get("partial", "")
-
-                if partial_text:
-                    print("Průběžně:", partial_text, end="\r")
+                    if text:
+                        collected_text.append(text)
+                        print("Rozpoznáno:", text)
+                        print("collected text: ", " ".join(collected_text))
+                        print("-" * 40)
+                        
+    except KeyboardInterrupt:
+        print("\n Program gone")
+        final_text = " ".join(collected_text)
+        print(final_text)
 
 
 if __name__ == "__main__":

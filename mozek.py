@@ -4,17 +4,19 @@ import queue
 import json
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
-import time
+
+from poslech import collected_text
 
 #setup
 engine = pyttsx3.init()
-MODEL_PATH = r"C:\Users\pavek\Desktop\UNOB\BMO\vosk-model-small-cs-0.4-rhasspy"
-SAMPLE_RATE = 32000
+MODEL_PATH = r"C:\Users\pavek\Desktop\UNOB\BMO\vosk-model-small-en-us-0.15"
+SAMPLE_RATE = 16000
 
 #dulezite promenne 
 audio_queue = queue.Queue()
+collected_text = []
 full_odpoved = ""
-full_otazka = ""
+full_otazka = collected_text
 model = Model(MODEL_PATH)
 recognizer = KaldiRecognizer(model, SAMPLE_RATE)
 
@@ -24,40 +26,33 @@ def callback(indata, frames, time, status):
         print(status)
     audio_queue.put(bytes(indata))
 
-with sd.RawInputStream(
-    samplerate=SAMPLE_RATE,
-    blocksize=8000,
-    dtype="int16",
-    channels=1,
-    callback=callback
-):
-    data = audio_queue.get()
+def poslech():
 
-    if recognizer.AcceptWaveform(data):
-        result = json.loads(recognizer.Result())
-        text = result.get("text", "")
+    model = Model(MODEL_PATH)
+    recognizer = KaldiRecognizer(model, SAMPLE_RATE)
+    with sd.RawInputStream(
+        samplerate=SAMPLE_RATE,
+        blocksize=8000,
+        dtype="int16",
+        channels=1,
+        callback=callback,
+    ):
+        while True:
+            data = audio_queue.get()
 
-        if text:
-            full_otazka += text
-            print("Rozpoznáno:", text)
-    else:
-        partial = json.loads(recognizer.PartialResult())
-        partial_text = partial.get("partial", "")
+            if recognizer.AcceptWaveform(data):
+                result = json.loads(recognizer.Result())
+                text = result.get("text", "")
 
-        if partial_text:
-            full_otazka += partial_text
-            print("Průběžně:", partial_text, end="\r")
+                if text:
+                    collected_text.append(text)
+                    print("rozpoznano: ", text)
+                    return text
 
-stream = chat(
-    model='gemma4',
-    messages=[{'role': 'user', 'content': 'who or what are you'}],
-    stream=True,
-)
+def main():
+    print("Zapínáme pásy, zapínáme zapínámeee")
+    otazka = poslech()
+    print("returnuta otazka: ", otazka)
 
-for chunk in stream:
-    part = chunk['message']["content"]
-    full_odpoved += part
-    
-    
 engine.say(full_odpoved)
 engine.runAndWait()
