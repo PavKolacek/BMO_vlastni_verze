@@ -41,9 +41,10 @@ def main():
                     if text:
                         collected_text.append(text)
                         print("Rozpoznáno:", text)
+                        return text
                         print("collected text: ", " ".join(collected_text))
                         print("-" * 40)
-                        
+
     except KeyboardInterrupt:
         print("\n Program gone")
         final_text = " ".join(collected_text)
